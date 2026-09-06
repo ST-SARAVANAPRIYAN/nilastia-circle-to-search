@@ -1,0 +1,14 @@
+{
+  "name": "circletosearch",
+  "author": "saravana",
+  "version": "1.0.0",
+  "description": "Android-style Circle to Search & Google Lens with instant screen freeze, lasso gesture, OCR text selection, and live in-place translation.",
+  "settings": "Settings.qml",
+  "entryPoints": [
+    {
+      "type": "custom",
+      "source": "Overlay.qml"
+    }
+  ],
+  "tags": ["lens", "search", "ocr", "translate", "circle-to-search"]
+}
