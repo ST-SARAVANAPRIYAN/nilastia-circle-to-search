@@ -2,17 +2,10 @@ import Nilastia.Plugins
 import QtQuick
 
 SettingsObject {
-    property string targetLanguage: "en"
-    property bool autoLensOnCircle: false
+    property bool autoLensOnCircle: true
     property bool iridescentBorder: true
     property real borderGlowWidth: 6.0
     property string lensBrowser: "auto"
-
-    SettingMeta on targetLanguage {
-        label: "Translate Target Language"
-        description: "Target language code to translate screen text into (e.g. en, es, fr, de, ta, ja)"
-        inputType: SettingMeta.TextField
-    }
 
     SettingMeta on autoLensOnCircle {
         label: "Auto-Search On Circle"
@@ -21,8 +14,8 @@ SettingsObject {
     }
 
     SettingMeta on iridescentBorder {
-        label: "Iridescent Rainbow Border"
-        description: "Show Android-style luminous rainbow border glow on trigger"
+        label: "Iridescent Rainbow Border & Screen Tint"
+        description: "Show Android-style luminous rainbow border glow and moving gradient tint on trigger"
         inputType: SettingMeta.Switch
     }
 
@@ -36,8 +29,8 @@ SettingsObject {
     }
 
     SettingMeta on lensBrowser {
-        label: "Browser Binary"
+        label: "Browser Application"
         description: "Browser to open Lens drawer: 'auto' (detects Brave, Chrome, Chromium, Firefox) or specify binary name"
-        inputType: SettingMeta.TextField
+        options: ["auto", "brave", "google-chrome-stable", "firefox", "chromium", "xdg-open"]
     }
 }

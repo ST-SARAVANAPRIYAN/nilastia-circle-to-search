@@ -19,87 +19,81 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def crop_image(src_path, dst_path, x, y, w, h):
     try:
         crop_arg = f"{int(w)}x{int(h)}+{int(x)}+{int(y)}"
-        subprocess.run(["magick", src_path, "-crop", crop_arg, "+repage", dst_path], check=True, capture_output=True)
+        subprocess.run(["magick", src_path, "-crop", crop_arg, "+repage", "-strip", dst_path], check=True, capture_output=True)
         return True
     except Exception as e:
         sys.stderr.write(f"Crop error: {e}\n")
         return False
 
-import base64
+def upload_to_temporary_host(img_path):
+    # 1. Primary: uguu.se (<0.7s, direct nginx static file serving, no Cloudflare block)
+    try:
+        boundary = uuid.uuid4().hex
+        with open(img_path, 'rb') as f:
+            img_data = f.read()
 
-def generate_lens_html(img_path):
-    if not os.path.exists(img_path):
-        raise FileNotFoundError(f"Image not found: {img_path}")
+        body = (
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="files[]"; filename="selection.png"\r\n'
+            f'Content-Type: image/png\r\n\r\n'
+        ).encode('utf-8') + img_data + f'\r\n--{boundary}--\r\n'.encode('utf-8')
 
-    with open(img_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
+        req = urllib.request.Request(
+            'https://uguu.se/upload',
+            data=body,
+            headers={
+                'User-Agent': 'NilastiaCTS/1.0',
+                'Content-Type': f'multipart/form-data; boundary={boundary}'
+            }
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data.get('success') and data.get('files'):
+                return data['files'][0]['url']
+    except Exception as e:
+        sys.stderr.write(f"uguu.se upload warning: {e}\n")
 
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Google Lens - Circle to Search</title>
-  <style>
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      background: #121212;
-      color: #e3e3e3;
-      font-family: system-ui, -apple-system, Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      overflow: hidden;
-    }}
-    .spinner {{
-      width: 36px;
-      height: 36px;
-      border: 3px solid rgba(255,255,255,0.1);
-      border-top-color: #8ab4f8;
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-      margin-bottom: 18px;
-    }}
-    @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
-    .title {{ font-size: 15px; font-weight: 500; letter-spacing: 0.2px; color: #e8eaed; }}
-    .sub {{ font-size: 12px; color: #9aa0a6; margin-top: 6px; }}
-  </style>
-</head>
-<body>
-  <div class="spinner"></div>
-  <div class="title">Searching with Google Lens...</div>
-  <div class="sub">Uploading selection</div>
-  <form id="lensForm" action="https://lens.google.com/upload?ep=subb&hl=en" method="POST" enctype="multipart/form-data" style="display:none;">
-    <input type="file" name="encoded_image" id="fileInput">
-  </form>
-  <script>
-    try {{
-      const b64 = "{b64}";
-      const binary = atob(b64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {{
-        bytes[i] = binary.charCodeAt(i);
-      }}
-      const file = new File([bytes], "selection.png", {{ type: "image/png" }});
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      const input = document.getElementById("fileInput");
-      input.files = dt.files;
-      document.getElementById("lensForm").submit();
-    }} catch (err) {{
-      document.body.innerHTML = "<div style='color:#f28b82;padding:24px;'>Error launching Lens: " + err.message + "</div>";
-    }}
-  </script>
-</body>
-</html>"""
+    # 2. Secondary Fallback: freeimage.host (<0.8s, direct iili.io CDN serving, no Cloudflare block)
+    try:
+        boundary = uuid.uuid4().hex
+        with open(img_path, 'rb') as f:
+            img_data = f.read()
 
-    html_path = "/tmp/cts-lens.html"
-    with open(html_path, "w", encoding="utf-8") as f:
-        f.write(html_content)
-    return html_path
+        body = (
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="key"\r\n\r\n6d207e02198a847aa98d0a2a901485a5\r\n'
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="action"\r\n\r\nupload\r\n'
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="format"\r\n\r\njson\r\n'
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="source"; filename="selection.png"\r\n'
+            f'Content-Type: image/png\r\n\r\n'
+        ).encode('utf-8') + img_data + f'\r\n--{boundary}--\r\n'.encode('utf-8')
+
+        req = urllib.request.Request(
+            'https://freeimage.host/api/1/upload',
+            data=body,
+            headers={
+                'User-Agent': 'NilastiaCTS/1.0',
+                'Content-Type': f'multipart/form-data; boundary={boundary}'
+            }
+        )
+        with urllib.request.urlopen(req, timeout=6) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if 'image' in data and 'url' in data['image']:
+                return data['image']['url']
+    except Exception as e:
+        sys.stderr.write(f"freeimage.host upload warning: {e}\n")
+
+    return None
+
+def get_lens_url(img_path):
+    pub_url = upload_to_temporary_host(img_path)
+    if pub_url:
+        import urllib.parse
+        return f"https://lens.google.com/upload?url={urllib.parse.quote(pub_url, safe=':/?=')}"
+    return None
 
 def copy_to_clipboard(path):
     try:
@@ -165,6 +159,7 @@ def main():
     parser.add_argument("--image", default="/tmp/cts-screen.png", help="Path to input image")
     parser.add_argument("--crop", default="", help="Crop box: x,y,w,h")
     parser.add_argument("--browser", default="auto", help="Browser binary to launch (default: auto)")
+    parser.add_argument("--copy-only", action="store_true", help="Only copy cropped selection to clipboard")
     parser.add_argument("--no-launch", action="store_true", help="Do not launch browser, only return URL")
 
     args = parser.parse_args()
@@ -180,12 +175,31 @@ def main():
         except Exception as e:
             sys.stderr.write(f"Failed to parse crop: {e}\n")
 
-    # Also stage image to clipboard for instantaneous manual paste if desired
+    # Copy image to clipboard via wl-copy
     copy_to_clipboard(target_img)
 
+    if args.copy_only:
+        subprocess.run([
+            "notify-send",
+            "-a", "Circle to Search",
+            "-i", "content_copy",
+            "Circle to Search",
+            "Cropped selection copied to clipboard"
+        ])
+        print(json.dumps({"status": "copied", "image": target_img}))
+        return 0
+
     try:
-        html_path = generate_lens_html(target_img)
-        target_url = f"file://{html_path}"
+        target_url = get_lens_url(target_img)
+        if not target_url:
+            target_url = "https://lens.google.com/"
+            subprocess.run([
+                "notify-send",
+                "-a", "Circle to Search",
+                "-i", "network-offline",
+                "Circle to Search",
+                "Network offline. Selection copied to clipboard - paste into Google Lens."
+            ])
 
         if not args.no_launch:
             browser_bin, browser_type = resolve_browser(args.browser)
@@ -201,28 +215,26 @@ def main():
                     "status": "no_browser",
                     "message": "Selection copied to clipboard. No web browser found on system.",
                     "url": target_url,
-                    "html": html_path,
                     "clipboard": True
                 }))
                 return 0
 
             if browser_type == "chromium":
-                subprocess.Popen([browser_bin, f"--app={target_url}", "--window-size=640,980"])
+                subprocess.Popen([browser_bin, f"--app={target_url}", "--window-size=640,980"], start_new_session=True)
             elif browser_type == "firefox":
-                subprocess.Popen([browser_bin, "--new-window", target_url])
+                subprocess.Popen([browser_bin, "--new-window", target_url], start_new_session=True)
             else:
-                subprocess.Popen([browser_bin, target_url])
+                subprocess.Popen([browser_bin, target_url], start_new_session=True)
 
             print(json.dumps({
                 "status": "ok",
                 "url": target_url,
-                "html": html_path,
                 "browser": browser_bin,
                 "type": browser_type
             }))
             return 0
         else:
-            print(json.dumps({"status": "ok", "url": target_url, "html": html_path}))
+            print(json.dumps({"status": "ok", "url": target_url}))
             return 0
     except Exception as e:
         sys.stderr.write(f"Lens error: {e}\n")
