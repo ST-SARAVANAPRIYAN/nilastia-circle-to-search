@@ -1,7 +1,7 @@
 {
   "name": "circletosearch",
   "author": "saravana",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Android-style Circle to Search & Google Lens with instant screen freeze, luminous iridescent gradient shimmer, and gesture search.",
   "settings": "Settings.qml",
   "settingsUi": "SettingsUi.qml",
@@ -9,6 +9,13 @@
     {
       "type": "custom",
       "source": "Overlay.qml"
+    }
+  ],
+  "binds": [
+    {
+      "key": "Mod+S",
+      "ipc": "circletosearch open",
+      "description": "Trigger Circle to Search & Google Lens"
     }
   ],
   "tags": ["lens", "search", "circle-to-search", "google-lens"]

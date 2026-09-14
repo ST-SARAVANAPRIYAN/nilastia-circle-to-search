@@ -16,7 +16,10 @@ import saravana.circletosearch 1.0
 Scope {
     id: root
 
-    property string pluginDir: "/home/saravana/projects/nilastia-circle-to-search"
+    property var entryPoint: null
+    property string pluginDir: (entryPoint && entryPoint.plugin && entryPoint.plugin.dir)
+                               ? entryPoint.plugin.dir
+                               : Qt.resolvedUrl(".").toString().replace(/^file:\/\//, "")
     property var settings: null
 
     property bool active: false
